@@ -39,7 +39,7 @@ if config.USER_SESSION:
     )
 
 HELP = (
-    "<b>Cloud Upload Bot</b>\n\n"
+    "<b>Demon Upload Bot</b>\n\n"
     "Send me any file, video, audio or photo. I'll store it on Wasabi cloud "
     "storage and give you a Download and a Share button.\n\n"
     "/myfiles - your latest uploads\n"
