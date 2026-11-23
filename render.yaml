@@ -14,7 +14,7 @@ services:
       - key: OWNER_ID
         sync: false
       - key: USER_SESSION
-        sync: false
+        sync: true 
       - key: FILEPRESS_BASE_URL
         value: https://new4.filepress.lat
       - key: FILEPRESS_UPLOAD_PATH
