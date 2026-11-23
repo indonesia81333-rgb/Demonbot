@@ -39,17 +39,24 @@ async def upload(path, filename, api_key):
         raise FilepressError("No filepress API key connected. Use /connect <key>.")
 
     url = config.FILEPRESS_BASE_URL + config.FILEPRESS_UPLOAD_PATH
-    headers = {config.FILEPRESS_AUTH_HEADER: config.FILEPRESS_AUTH_PREFIX + api_key}
+    headers, params = {}, {}
+    mode = config.FILEPRESS_AUTH_MODE
+    if mode == "header":
+        headers[config.FILEPRESS_AUTH_HEADER] = config.FILEPRESS_AUTH_PREFIX + api_key
+    elif mode == "query":
+        params[config.FILEPRESS_AUTH_PARAM] = api_key
     timeout = aiohttp.ClientTimeout(total=None, sock_connect=30)
 
     async with aiohttp.ClientSession(timeout=timeout) as session:
         with open(path, "rb") as fh:
             form = aiohttp.FormData()
+            if mode == "form":
+                form.add_field(config.FILEPRESS_AUTH_PARAM, api_key)
             form.add_field(config.FILEPRESS_FILE_FIELD, fh, filename=filename)
-            async with session.post(url, data=form, headers=headers) as resp:
+            async with session.post(url, data=form, headers=headers, params=params) as resp:
                 text = await resp.text()
                 if resp.status in (401, 403):
-                    raise FilepressError("Filepress rejected your API key.")
+                    raise FilepressError(f"Filepress rejected the key ({resp.status}): {text[:200]}")
                 if resp.status >= 400:
                     raise FilepressError(f"Filepress error {resp.status}: {text[:200]}")
                 try:
