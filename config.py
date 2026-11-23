@@ -19,22 +19,13 @@ OWNER_ID = _int("OWNER_ID")
 # Optional: Telegram Premium user session string (enables files up to 4GB for the owner)
 USER_SESSION = os.getenv("USER_SESSION", "")
 
-# --- Filepress ---
-FILEPRESS_BASE_URL = os.getenv("FILEPRESS_BASE_URL", "https://new4.filepress.lat").rstrip("/")
-# The upload endpoint path and auth header of your filepress account/API.
-# Check your filepress developer/API page and adjust these three if they differ.
-FILEPRESS_UPLOAD_PATH = os.getenv("FILEPRESS_UPLOAD_PATH", "/api/v1/file/upload")
-FILEPRESS_AUTH_HEADER = os.getenv("FILEPRESS_AUTH_HEADER", "Authorization")
-FILEPRESS_AUTH_PREFIX = os.getenv("FILEPRESS_AUTH_PREFIX", "Bearer ")
-# How the key is sent: "header" (default), "form" (extra multipart field), or "query" (?key=...)
-FILEPRESS_AUTH_MODE = os.getenv("FILEPRESS_AUTH_MODE", "header")
-# Name of the form field / query parameter when AUTH_MODE is "form" or "query"
-FILEPRESS_AUTH_PARAM = os.getenv("FILEPRESS_AUTH_PARAM", "key")
-FILEPRESS_FILE_FIELD = os.getenv("FILEPRESS_FILE_FIELD", "file")
-# Dotted path to the link inside the JSON response, e.g. "data.url". Falls back to first URL found.
-FILEPRESS_LINK_FIELD = os.getenv("FILEPRESS_LINK_FIELD", "data.url")
-# Used if a user hasn't connected their own key
-FILEPRESS_DEFAULT_KEY = os.getenv("FILEPRESS_DEFAULT_KEY", "")
+# --- Wasabi (S3-compatible) ---
+WASABI_ACCESS_KEY = os.getenv("WASABI_ACCESS_KEY", "")
+WASABI_SECRET_KEY = os.getenv("WASABI_SECRET_KEY", "")
+WASABI_BUCKET = os.getenv("WASABI_BUCKET", "")
+WASABI_REGION = os.getenv("WASABI_REGION", "us-east-1")
+WASABI_ENDPOINT = os.getenv("WASABI_ENDPOINT", f"https://s3.{WASABI_REGION}.wasabisys.com")
+WASABI_ENABLED = all([WASABI_ACCESS_KEY, WASABI_SECRET_KEY, WASABI_BUCKET])
 
 # --- Limits ---
 BOT_MAX_SIZE = 2 * 1024**3        # MTProto bot download limit
