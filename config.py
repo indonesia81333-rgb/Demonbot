@@ -26,6 +26,10 @@ FILEPRESS_BASE_URL = os.getenv("FILEPRESS_BASE_URL", "https://new4.filepress.lat
 FILEPRESS_UPLOAD_PATH = os.getenv("FILEPRESS_UPLOAD_PATH", "/api/v1/file/upload")
 FILEPRESS_AUTH_HEADER = os.getenv("FILEPRESS_AUTH_HEADER", "Authorization")
 FILEPRESS_AUTH_PREFIX = os.getenv("FILEPRESS_AUTH_PREFIX", "Bearer ")
+# How the key is sent: "header" (default), "form" (extra multipart field), or "query" (?key=...)
+FILEPRESS_AUTH_MODE = os.getenv("FILEPRESS_AUTH_MODE", "header")
+# Name of the form field / query parameter when AUTH_MODE is "form" or "query"
+FILEPRESS_AUTH_PARAM = os.getenv("FILEPRESS_AUTH_PARAM", "key")
 FILEPRESS_FILE_FIELD = os.getenv("FILEPRESS_FILE_FIELD", "file")
 # Dotted path to the link inside the JSON response, e.g. "data.url". Falls back to first URL found.
 FILEPRESS_LINK_FIELD = os.getenv("FILEPRESS_LINK_FIELD", "data.url")
