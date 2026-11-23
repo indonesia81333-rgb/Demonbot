@@ -109,22 +109,22 @@ async def status_cmd(_, msg: Message):
     )
 
 
-class Progress:
-    """Throttled progress updates for Telegram downloads."""
+def make_progress(status: Message, label: str):
+    """Throttled progress updates. Must be a plain async function so Pyrogram awaits it."""
+    last = [0.0]
 
-    def __init__(self, status: Message, label: str):
-        self.status, self.label, self.last = status, label, 0.0
-
-    async def __call__(self, current, total):
+    async def progress(current, total):
         now = time.time()
-        if now - self.last < 4 and current != total:
+        if now - last[0] < 4 and current != total:
             return
-        self.last = now
+        last[0] = now
         pct = current * 100 / total if total else 0
         try:
-            await self.status.edit_text(f"{self.label}\n{human(current)} / {human(total)} ({pct:.0f}%)")
+            await status.edit_text(f"{label}\n{human(current)} / {human(total)} ({pct:.0f}%)")
         except Exception:
             pass
+
+    return progress
 
 
 async def fetch_large_via_user(msg: Message, size: int, dest: str):
@@ -174,7 +174,7 @@ async def handle_file(_, msg: Message):
             await status.edit_text("Downloading via Premium session...")
             path = await fetch_large_via_user(msg, size, dest)
         else:
-            path = await msg.download(file_name=dest, progress=Progress(status, "Downloading..."))
+            path = await msg.download(file_name=dest, progress=make_progress(status, "Downloading..."))
         await status.edit_text(f"Uploading to Filepress... ({human(size)})")
         link = await filepress.upload(path, name, key)
         await db.add_usage(uid, size)
