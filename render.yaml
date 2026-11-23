@@ -1,0 +1,27 @@
+services:
+  - type: web
+    name: wasabi-telegram-bot
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: API_ID
+        sync: false
+      - key: API_HASH
+        sync: false
+      - key: BOT_TOKEN
+        sync: false
+      - key: OWNER_ID
+        sync: false
+      - key: USER_SESSION
+        sync: false
+      - key: WASABI_ACCESS_KEY
+        sync: false
+      - key: WASABI_SECRET_KEY
+        sync: false
+      - key: WASABI_BUCKET
+        sync: false
+      - key: WASABI_REGION
+        value: us-east-1
+      - key: DB_PATH
+        value: /app/data/bot.db
