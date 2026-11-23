@@ -1,44 +1,41 @@
-# Filepress Telegram Bot
+# Wasabi Telegram Upload Bot
 
-Telegram bot that takes any file you send, uploads it to filepress using your own
-developer API key, and replies with **Download** and **Share** buttons.
+Send any file to the bot; it uploads it to your Wasabi bucket and replies with **Download** and **Share** buttons.
 
 ## Features
-- Upload via your personal Filepress API key (`/connect <key>`), stored per user
-- Download link + Share button on every result
-- Live download progress, automatic temp-file cleanup
+- Wasabi (S3-compatible) multipart uploads, parallel and fast
+- Real-time progress in Telegram (bar, speed, ETA) for both download and upload
+- Permanent bot-hosted links (`/d/<token>`) that redirect to a fresh signed Wasabi URL each time
+- Animated live dashboard at `/` (uptime, users, files, data, live transfer progress), JSON at `/api/status`, health check at `/health`
 - Up to 2 GB per file; 4 GB for the owner with a Telegram Premium session
-- Web dashboard at `/` (status, uptime, users, files, data transferred), JSON at `/api/status`, health check at `/health`
-- Self-ping keep-alive, Dockerfile and `render.yaml` for Render
+- Dockerfile and `render.yaml` for Render
 
-## Setup
-1. Get `API_ID` and `API_HASH` from https://my.telegram.org and a `BOT_TOKEN` from @BotFather.
-2. Copy `.env.example` to `.env` and fill it in.
-3. **Check your filepress API docs** and set `FILEPRESS_UPLOAD_PATH`, `FILEPRESS_AUTH_HEADER`,
-   `FILEPRESS_AUTH_PREFIX`, `FILEPRESS_FILE_FIELD` and `FILEPRESS_LINK_FIELD` to match.
-   These defaults are placeholders; the bot was written without access to that API's documentation.
-4. Run locally:
-   ```
-   pip install -r requirements.txt
-   python bot.py
-   ```
-   Dashboard: http://localhost:8080
+## Environment variables
+| Name | Purpose |
+|---|---|
+| `API_ID`, `API_HASH` | from https://my.telegram.org |
+| `BOT_TOKEN` | from @BotFather |
+| `OWNER_ID` | your Telegram user id |
+| `WASABI_ACCESS_KEY` / `WASABI_SECRET_KEY` | Wasabi access keys |
+| `WASABI_BUCKET` | bucket name |
+| `WASABI_REGION` | bucket region, e.g. `us-east-1`, `ap-southeast-1` |
+| `WASABI_ENDPOINT` | optional override; default `https://s3.<region>.wasabisys.com` |
+| `USER_SESSION` | optional Premium session string for 4 GB owner uploads |
+
+## Run locally
+```
+pip install -r requirements.txt
+python bot.py
+```
 
 ## Deploy on Render
-1. Push this folder to a GitHub repo.
-2. Render > New > Blueprint (or Web Service with Docker) > select the repo.
-3. Fill the secret env vars (`API_ID`, `API_HASH`, `BOT_TOKEN`, `OWNER_ID`).
-4. Render sets `RENDER_EXTERNAL_URL` automatically; the bot pings `/health` every 10 min.
-   The free plan can still sleep; use a paid instance or an external uptime monitor (e.g. UptimeRobot on `/health`) for true non-stop running.
-5. SQLite data is lost on redeploy unless you attach a persistent disk mounted at `/app/data`.
+1. Push this folder to GitHub, then Render > New > Blueprint.
+2. Fill the secret env vars. Render sets `RENDER_EXTERNAL_URL`, which is used to build the permanent download links.
+3. The free plan can sleep; use a paid instance or an uptime monitor on `/health`.
+4. Attach a persistent disk at `/app/data`, or the file-link database is lost on redeploy and old `/d/` links stop working.
 
-## File size limits
-- Bot accounts can download up to 2 GB over MTProto.
-- 4 GB works only for the owner: set `USER_SESSION` (Pyrogram session string of a Premium account), `OWNER_ID`, and send the file from that account to the bot. The bot finds it in that account's chat history and downloads it with the Premium session.
-- Render free disk is small and ephemeral, so very large files need enough disk on your plan.
-
-## Commands
-`/start` `/help` `/connect <key>` `/mykey` `/disconnect` `/status`
-
-## Security
-Keys are stored in plain text in SQLite. Protect the disk, or add encryption before opening the bot to the public.
+## Notes
+- Without `RENDER_EXTERNAL_URL`/`APP_URL`, links are direct signed Wasabi URLs that expire after 7 days (the S3 maximum).
+- The dashboard is public and never shows file names.
+- The bucket should stay private; the bot serves files through signed URLs.
+- Render needs enough disk for the largest file, since files are staged locally before upload.
