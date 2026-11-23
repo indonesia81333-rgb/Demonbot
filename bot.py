@@ -1,6 +1,9 @@
 import asyncio
 import logging
+import mimetypes
 import os
+import re
+import secrets
 import time
 import uuid
 from urllib.parse import quote
@@ -10,7 +13,7 @@ from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 import config
 import db
-import filepress
+import storage
 import web
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -19,7 +22,7 @@ log = logging.getLogger("bot")
 os.makedirs(config.DOWNLOAD_DIR, exist_ok=True)
 
 bot = Client(
-    "filepress_bot",
+    "wasabi_bot",
     api_id=config.API_ID,
     api_hash=config.API_HASH,
     bot_token=config.BOT_TOKEN,
@@ -36,12 +39,10 @@ if config.USER_SESSION:
     )
 
 HELP = (
-    "<b>Filepress Upload Bot</b>\n\n"
-    "Send me any file, video, audio or photo and I'll upload it to Filepress "
-    "and give you a download link.\n\n"
-    "/connect &lt;api_key&gt; - connect your Filepress developer API key\n"
-    "/mykey - show whether a key is connected\n"
-    "/disconnect - remove your key\n"
+    "<b>Cloud Upload Bot</b>\n\n"
+    "Send me any file, video, audio or photo. I'll store it on Wasabi cloud "
+    "storage and give you a Download and a Share button.\n\n"
+    "/myfiles - your latest uploads\n"
     "/status - bot status and uptime\n"
     "/help - this message\n\n"
     "Limit: 2 GB per file (4 GB for the owner with a Premium session)."
@@ -52,6 +53,20 @@ def human(n):
     return web.fmt_size(n)
 
 
+def bar(pct, n=14):
+    filled = int(n * pct / 100)
+    return "▰" * filled + "▱" * (n - filled)
+
+
+def fmt_eta(sec):
+    sec = int(sec)
+    if sec <= 0:
+        return "--"
+    m, s = divmod(sec, 60)
+    h, m = divmod(m, 60)
+    return f"{h}h {m}m" if h else (f"{m}m {s}s" if m else f"{s}s")
+
+
 def media_of(msg: Message):
     for kind in ("document", "video", "audio", "voice", "animation", "video_note", "photo"):
         m = getattr(msg, kind, None)
@@ -60,39 +75,45 @@ def media_of(msg: Message):
     return None, None
 
 
+def safe_name(name):
+    return re.sub(r"[\\/\x00-\x1f]", "_", name).strip() or "file"
+
+
+def link_for(token, key, name):
+    if config.APP_URL:
+        return f"{config.APP_URL.rstrip('/')}/d/{token}"
+    return storage.presign(key, name, storage.MAX_PRESIGN)  # 7 days max without a public app URL
+
+
+def make_progress(status: Message, label: str, job: dict):
+    """Live progress. Must be a plain async function so Pyrogram awaits it."""
+    last = [0.0]
+    t0 = time.time()
+
+    async def progress(current, total):
+        now = time.time()
+        pct = current * 100 / total if total else 0
+        job.update(stage=label, pct=round(pct, 1))
+        if now - last[0] < 3 and current != total:
+            return
+        last[0] = now
+        speed = current / max(now - t0, 0.001)
+        eta = (total - current) / speed if speed and total else 0
+        try:
+            await status.edit_text(
+                f"<b>{label}</b>\n<code>{bar(pct)}</code> {pct:.0f}%\n"
+                f"{human(current)} / {human(total)}\n"
+                f"Speed {human(speed)}/s · ETA {fmt_eta(eta)}"
+            )
+        except Exception:
+            pass
+
+    return progress
+
+
 @bot.on_message(filters.command(["start", "help"]) & filters.private)
 async def start_cmd(_, msg: Message):
     await msg.reply_text(HELP)
-
-
-@bot.on_message(filters.command("connect") & filters.private)
-async def connect_cmd(_, msg: Message):
-    if len(msg.command) < 2:
-        return await msg.reply_text("Usage: <code>/connect YOUR_FILEPRESS_API_KEY</code>")
-    key = msg.command[1].strip()
-    await db.set_key(msg.from_user.id, key)
-    try:
-        await msg.delete()  # remove the message that contains the key
-    except Exception:
-        pass
-    await bot.send_message(msg.chat.id, "Filepress API key connected. Now send me a file.")
-
-
-@bot.on_message(filters.command("mykey") & filters.private)
-async def mykey_cmd(_, msg: Message):
-    key = await db.get_key(msg.from_user.id)
-    if key:
-        await msg.reply_text(f"Connected: <code>{key[:4]}...{key[-4:]}</code>")
-    elif config.FILEPRESS_DEFAULT_KEY:
-        await msg.reply_text("No personal key set; the bot's default key will be used.")
-    else:
-        await msg.reply_text("No key connected. Use /connect &lt;api_key&gt;.")
-
-
-@bot.on_message(filters.command("disconnect") & filters.private)
-async def disconnect_cmd(_, msg: Message):
-    await db.del_key(msg.from_user.id)
-    await msg.reply_text("API key removed.")
 
 
 @bot.on_message(filters.command("status") & filters.private)
@@ -101,36 +122,30 @@ async def status_cmd(_, msg: Message):
     await msg.reply_text(
         f"<b>Status:</b> {s['status']}\n"
         f"<b>Uptime:</b> {s['uptime']}\n"
-        f"<b>Active jobs:</b> {s['active_jobs']}\n"
+        f"<b>Active transfers:</b> {s['active_jobs']}\n"
         f"<b>Users:</b> {s['users']}\n"
         f"<b>Files:</b> {s['files']} ({s['size_human']})\n"
-        f"<b>Filepress:</b> {'reachable' if s['filepress_reachable'] else 'unreachable'}\n"
+        f"<b>Wasabi:</b> {'connected' if s['backend_ok'] else 'unreachable'}\n"
         f"<b>Premium session:</b> {'on' if s['premium_session'] else 'off'}"
     )
 
 
-def make_progress(status: Message, label: str):
-    """Throttled progress updates. Must be a plain async function so Pyrogram awaits it."""
-    last = [0.0]
-
-    async def progress(current, total):
-        now = time.time()
-        if now - last[0] < 4 and current != total:
-            return
-        last[0] = now
-        pct = current * 100 / total if total else 0
-        try:
-            await status.edit_text(f"{label}\n{human(current)} / {human(total)} ({pct:.0f}%)")
-        except Exception:
-            pass
-
-    return progress
+@bot.on_message(filters.command("myfiles") & filters.private)
+async def myfiles_cmd(_, msg: Message):
+    rows = await db.recent_files(msg.from_user.id, 10)
+    if not rows:
+        return await msg.reply_text("No uploads yet. Send me a file!")
+    lines = []
+    for token, name, size in rows:
+        url = f"{config.APP_URL.rstrip('/')}/d/{token}" if config.APP_URL else None
+        lines.append(f"• <a href=\"{url}\">{name}</a> ({human(size)})" if url else f"• {name} ({human(size)})")
+    await msg.reply_text("<b>Your latest files</b>\n" + "\n".join(lines), disable_web_page_preview=True)
 
 
-async def fetch_large_via_user(msg: Message, size: int, dest: str):
+async def fetch_large_via_user(msg: Message, dest: str):
     """Owner-only: >2GB files are pulled with the Premium user session."""
     me = await bot.get_me()
-    media_kind, media = media_of(msg)
+    _, media = media_of(msg)
     async for m in user_client.get_chat_history(me.username, limit=20):
         _, um = media_of(m)
         if um and um.file_unique_id == media.file_unique_id:
@@ -144,11 +159,15 @@ async def fetch_large_via_user(msg: Message, size: int, dest: str):
 )
 async def handle_file(_, msg: Message):
     uid = msg.from_user.id
+    if not storage.enabled():
+        return await msg.reply_text("Storage isn't configured. The owner must set the WASABI_* variables.")
+
     kind, media = media_of(msg)
     size = getattr(media, "file_size", 0) or 0
-    name = getattr(media, "file_name", None) or f"{kind}_{msg.id}"
-    if kind == "photo" and "." not in name:
-        name += ".jpg"
+    name = safe_name(getattr(media, "file_name", None) or f"{kind}_{msg.id}")
+    if "." not in name:
+        ext = mimetypes.guess_extension(getattr(media, "mime_type", "") or "") or (".jpg" if kind == "photo" else "")
+        name += ext
     use_user = False
 
     if size > config.BOT_MAX_SIZE:
@@ -160,24 +179,28 @@ async def handle_file(_, msg: Message):
                 f"(4 GB needs the owner's Premium session)."
             )
 
-    key = await db.get_key(uid)
-    if not key and not config.FILEPRESS_DEFAULT_KEY:
-        return await msg.reply_text("Connect your key first: <code>/connect YOUR_API_KEY</code>")
-
-    status = await msg.reply_text("Starting download...")
+    status = await msg.reply_text("Starting...")
     work_dir = os.path.join(config.DOWNLOAD_DIR, uuid.uuid4().hex)
     os.makedirs(work_dir, exist_ok=True)
     dest = os.path.join(work_dir, name)
-    web.state["processing"] += 1
+    job_id = uuid.uuid4().hex
+    job = {"stage": "Queued", "pct": 0}
+    web.state["jobs"][job_id] = job
     try:
         if use_user:
             await status.edit_text("Downloading via Premium session...")
-            path = await fetch_large_via_user(msg, size, dest)
+            path = await fetch_large_via_user(msg, dest)
         else:
-            path = await msg.download(file_name=dest, progress=make_progress(status, "Downloading..."))
-        await status.edit_text(f"Uploading to Filepress... ({human(size)})")
-        link = await filepress.upload(path, name, key)
-        await db.add_usage(uid, size)
+            path = await msg.download(file_name=dest, progress=make_progress(status, "Downloading from Telegram", job))
+        real_size = os.path.getsize(path)
+
+        key = f"{uid}/{uuid.uuid4().hex[:8]}/{name}"
+        await storage.upload(path, key, real_size, make_progress(status, "Uploading to Wasabi", job))
+
+        token = secrets.token_urlsafe(8)
+        await db.add_file(token, uid, key, name, real_size)
+        await db.add_usage(uid, real_size)
+        link = link_for(token, key, name)
 
         share_url = f"https://t.me/share/url?url={quote(link)}&text={quote(name)}"
         kb = InlineKeyboardMarkup(
@@ -187,20 +210,17 @@ async def handle_file(_, msg: Message):
             ]]
         )
         await status.edit_text(
-            f"<b>Uploaded</b>\n\n<b>Name:</b> <code>{name}</code>\n"
-            f"<b>Size:</b> {human(size)}\n<b>Link:</b> {link}",
+            f"<b>Upload complete</b>\n<code>{bar(100)}</code> 100%\n\n"
+            f"<b>Name:</b> <code>{name}</code>\n<b>Size:</b> {human(real_size)}\n<b>Link:</b> {link}",
             reply_markup=kb,
             disable_web_page_preview=True,
         )
-    except filepress.FilepressError as e:
-        web.state["errors"] += 1
-        await status.edit_text(f"Upload failed: {e}")
     except Exception as e:
         web.state["errors"] += 1
         log.exception("handler failed")
-        await status.edit_text(f"Something went wrong: {e}")
+        await status.edit_text(f"Upload failed: {e}")
     finally:
-        web.state["processing"] -= 1
+        web.state["jobs"].pop(job_id, None)
         try:
             for f in os.listdir(work_dir):
                 os.remove(os.path.join(work_dir, f))
