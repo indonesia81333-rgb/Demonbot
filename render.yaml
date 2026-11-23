@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: filepress-telegram-bot
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: API_ID
+        sync: false
+      - key: API_HASH
+        sync: false
+      - key: BOT_TOKEN
+        sync: false
+      - key: OWNER_ID
+        sync: false
+      - key: USER_SESSION
+        sync: false
+      - key: FILEPRESS_BASE_URL
+        value: https://new4.filepress.lat
+      - key: FILEPRESS_UPLOAD_PATH
+        value: /api/v1/file/upload
+      - key: FILEPRESS_LINK_FIELD
+        value: data.url
+      - key: DB_PATH
+        value: /app/data/bot.db
