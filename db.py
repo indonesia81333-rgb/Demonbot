@@ -1,6 +1,7 @@
 import asyncio
 import os
 import sqlite3
+import time
 
 from config import DB_PATH
 
@@ -11,9 +12,16 @@ _conn.executescript(
     """
     CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY,
-        api_key TEXT,
         files INTEGER DEFAULT 0,
         bytes INTEGER DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS files (
+        token TEXT PRIMARY KEY,
+        user_id INTEGER,
+        key TEXT,
+        name TEXT,
+        size INTEGER,
+        created REAL
     );
     """
 )
@@ -30,23 +38,6 @@ async def _run(sql, args=(), fetch=False):
         return await asyncio.to_thread(work)
 
 
-async def set_key(user_id, key):
-    await _run(
-        "INSERT INTO users(user_id, api_key) VALUES(?, ?) "
-        "ON CONFLICT(user_id) DO UPDATE SET api_key=excluded.api_key",
-        (user_id, key),
-    )
-
-
-async def get_key(user_id):
-    rows = await _run("SELECT api_key FROM users WHERE user_id=?", (user_id,), fetch=True)
-    return rows[0][0] if rows and rows[0][0] else None
-
-
-async def del_key(user_id):
-    await _run("UPDATE users SET api_key=NULL WHERE user_id=?", (user_id,))
-
-
 async def add_usage(user_id, size):
     await _run(
         "INSERT INTO users(user_id, files, bytes) VALUES(?, 1, ?) "
@@ -61,3 +52,23 @@ async def totals():
         fetch=True,
     )
     return rows[0]
+
+
+async def add_file(token, user_id, key, name, size):
+    await _run(
+        "INSERT INTO files(token, user_id, key, name, size, created) VALUES(?,?,?,?,?,?)",
+        (token, user_id, key, name, size, time.time()),
+    )
+
+
+async def get_file(token):
+    rows = await _run("SELECT key, name, size FROM files WHERE token=?", (token,), fetch=True)
+    return rows[0] if rows else None
+
+
+async def recent_files(user_id, limit=10):
+    return await _run(
+        "SELECT token, name, size FROM files WHERE user_id=? ORDER BY created DESC LIMIT ?",
+        (user_id, limit),
+        fetch=True,
+    )
