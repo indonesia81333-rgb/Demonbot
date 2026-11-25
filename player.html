@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#07080d">
+<title>__TITLE__ · Nova Media Player</title>
+<style>
+:root{--bg:#07080d;--card:rgba(255,255,255,.05);--line:rgba(255,255,255,.1);--tx:#eef0f6;--mu:#8a91a5;--ok:#34d399;--bad:#fb7185;--a:#7c5cff;--b:#22d3ee;color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{min-height:100vh;background:var(--bg);color:var(--tx);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+:focus-visible{outline:2px solid var(--b);outline-offset:2px}
+.blob{position:fixed;width:46vmax;height:46vmax;border-radius:50%;filter:blur(90px);opacity:.26;z-index:0;animation:float 18s ease-in-out infinite;pointer-events:none}
+.b1{background:var(--a);top:-18vmax;left:-12vmax}
+.b2{background:var(--b);bottom:-20vmax;right:-14vmax;animation-delay:-9s}
+@keyframes float{50%{transform:translate(6vmax,4vmax) scale(1.12)}}
+@keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes eq{50%{height:34px}}
+.wrap{position:relative;z-index:1;max-width:980px;margin:0 auto;padding:max(24px,env(safe-area-inset-top)) 18px 48px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:20px;animation:rise .6s both}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:20px;letter-spacing:-.02em}
+.brand .name{background:linear-gradient(90deg,#fff,#b9a8ff 60%,#7ee8fa);-webkit-background-clip:text;background-clip:text;color:transparent}
+.logo{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(135deg,var(--a),var(--b));color:#fff;box-shadow:0 6px 24px rgba(124,92,255,.45)}
+.pill{padding:7px 14px;border-radius:99px;background:var(--card);border:1px solid var(--line);font-size:13px;color:var(--mu);backdrop-filter:blur(12px)}
+
+.player{background:var(--card);border:1px solid var(--line);border-radius:22px;overflow:hidden;backdrop-filter:blur(14px);box-shadow:0 30px 80px rgba(0,0,0,.35);animation:rise .6s .05s both}
+.screen{position:relative;background:#000;aspect-ratio:16/9;display:grid;place-items:center;overflow:hidden}
+.screen video{width:100%;height:100%;object-fit:contain;display:block;background:#000}
+.screen audio{display:none}
+.kind-audio .screen{aspect-ratio:auto;min-height:250px;background:radial-gradient(120% 120% at 15% 0%,rgba(124,92,255,.38),transparent 60%),radial-gradient(120% 120% at 100% 100%,rgba(34,211,238,.28),transparent 60%),#0b0d16}
+.kind-image .screen{display:flex;aspect-ratio:auto;min-height:260px;max-height:78vh;overflow:auto;background:#05060a}
+.kind-image .screen img{margin:auto;max-width:100%;max-height:78vh;object-fit:contain;cursor:zoom-in}
+.kind-image .screen img.actual{max-width:none;max-height:none;cursor:zoom-out}
+
+.cover{display:flex;flex-direction:column;align-items:center;gap:22px;padding:28px}
+.disc{width:112px;height:112px;border-radius:50%;display:grid;place-items:center;color:#fff;background:linear-gradient(135deg,var(--a),var(--b));box-shadow:0 14px 50px rgba(124,92,255,.5)}
+.playing .disc{animation:spin 6s linear infinite}
+.eq{display:flex;align-items:flex-end;height:36px}
+.eq i{display:inline-block;width:5px;height:8px;margin:0 2px;border-radius:3px;background:linear-gradient(var(--b),var(--a))}
+.playing .eq i{animation:eq 1s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.15s!important}
+.eq i:nth-child(3){animation-delay:.3s!important}
+.eq i:nth-child(4){animation-delay:.45s!important}
+.eq i:nth-child(5){animation-delay:.6s!important}
+
+.bigplay{position:absolute;width:76px;height:76px;border-radius:50%;border:1px solid rgba(255,255,255,.25);background:rgba(10,12,20,.55);backdrop-filter:blur(10px);color:#fff;display:grid;place-items:center;cursor:pointer;transition:transform .2s,opacity .2s}
+.bigplay:hover{transform:scale(1.08)}
+.playing .bigplay,.kind-audio .bigplay{opacity:0;pointer-events:none}
+.kind-audio .bigplay{display:none}
+.spinner{position:absolute;width:44px;height:44px;border-radius:50%;border:3px solid rgba(255,255,255,.2);border-top-color:var(--b);animation:spin .8s linear infinite;pointer-events:none}
+.err{position:absolute;inset:0;display:grid;place-items:center;padding:22px;text-align:center;background:rgba(7,8,13,.9);z-index:2}
+.err strong{display:block;font-size:17px;margin-bottom:8px}
+.err p{margin:0 auto 16px;max-width:460px;color:var(--mu);font-size:14px;line-height:1.55}
+.err .actions{justify-content:center}
+
+.controls{padding:12px 16px 14px;display:flex;flex-direction:column;gap:8px}
+.seek{position:relative;height:18px;display:flex;align-items:center}
+.rail{position:absolute;left:0;right:0;height:5px;border-radius:9px;background:rgba(255,255,255,.1);overflow:hidden}
+.buf,.fill{position:absolute;top:0;bottom:0;left:0;width:0}
+.buf{background:rgba(255,255,255,.18)}
+.fill{background:linear-gradient(90deg,var(--a),var(--b))}
+.seek input{position:relative;width:100%;height:18px;margin:0;background:transparent;-webkit-appearance:none;appearance:none;cursor:pointer}
+.seek input::-webkit-slider-runnable-track{background:transparent;height:18px}
+.seek input::-moz-range-track{background:transparent;height:18px}
+.seek input::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;margin-top:2px;border-radius:50%;background:#fff;box-shadow:0 0 0 4px rgba(124,92,255,.35)}
+.seek input::-moz-range-thumb{width:14px;height:14px;border:0;border-radius:50%;background:#fff;box-shadow:0 0 0 4px rgba(124,92,255,.35)}
+.row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.row .sp{flex:1}
+.ib{background:transparent;border:0;color:var(--tx);width:40px;height:40px;border-radius:12px;display:grid;place-items:center;cursor:pointer;font:inherit;transition:background .2s,color .2s}
+.ib:hover{background:rgba(255,255,255,.09)}
+.ib.on{color:var(--b)}
+.ib.txt{width:auto;padding:0 10px;font-size:13px;font-weight:600}
+.ib.main{width:46px;height:46px;border-radius:50%;background:linear-gradient(135deg,var(--a),var(--b));color:#fff}
+.ib.main:hover{filter:brightness(1.12)}
+.time{margin-left:6px;font-size:13px;color:var(--mu);font-variant-numeric:tabular-nums}
+.spd{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:10px;padding:7px 8px;font:inherit;font-size:13px}
+.spd option{background:#11131c}
+.vol{width:84px;accent-color:var(--a)}
+
+.player:fullscreen{display:flex;flex-direction:column;border-radius:0;background:#000}
+.player:fullscreen .screen{flex:1;aspect-ratio:auto;min-height:0}
+.player:-webkit-full-screen{display:flex;flex-direction:column;border-radius:0;background:#000}
+.player:-webkit-full-screen .screen{flex:1;aspect-ratio:auto;min-height:0}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;backdrop-filter:blur(14px)}
+.info{margin-top:16px;animation:rise .6s .1s both}
+h1{font-size:18px;margin:0 0 4px;word-break:break-word}
+.sub{margin:0 0 16px;color:var(--mu);font-size:13px}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:13px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--tx);font:inherit;font-size:14px;font-weight:600;text-decoration:none;cursor:pointer;transition:transform .2s,border-color .2s}
+.btn:hover{transform:translateY(-2px);border-color:rgba(124,92,255,.6)}
+.btn.primary{background:linear-gradient(135deg,var(--a),var(--b));border-color:transparent;color:#fff}
+.hint{margin:14px 0 0;color:var(--mu);font-size:12.5px;line-height:1.5}
+.keys{margin:16px 4px 0;color:var(--mu);font-size:12px;line-height:1.7;text-align:center}
+kbd{padding:1px 6px;border:1px solid var(--line);border-radius:6px;background:var(--card);font:inherit;font-size:11.5px}
+.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);opacity:0;padding:10px 18px;border-radius:99px;background:rgba(20,22,32,.95);border:1px solid var(--line);font-size:13px;pointer-events:none;transition:opacity .25s,transform .25s;z-index:10}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media (max-width:560px){.vol{display:none}.screen video{max-height:70vh}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="blob b1"></div><div class="blob b2"></div>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path fill="currentColor" d="M8 5v14l11-7z"/></svg></span>
+      <span class="name">Nova Media Player</span>
+    </div>
+    <div class="pill" id="meta"></div>
+  </header>
+
+  <section class="player" id="player" aria-label="Media player">
+    <div class="screen" id="screen">
+      <div id="box" style="display:contents"></div>
+      <div class="cover" id="cover" hidden>
+        <div class="disc" aria-hidden="true"><svg viewBox="0 0 24 24" width="48" height="48"><path fill="currentColor" d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/></svg></div>
+        <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <button class="bigplay" id="bigplay" type="button" aria-label="Play"></button>
+      <div class="spinner" id="spin" hidden></div>
+      <div class="err" id="err" hidden>
+        <div>
+          <strong>This file can't be played here</strong>
+          <p>Your browser may not support this format (for example MKV, AVI or FLAC on some devices), or the playback link expired. Reload the page, or download the file and open it in VLC or another player.</p>
+          <div class="actions">
+            <a class="btn primary" id="errdl" href="#">Download</a>
+            <button class="btn" id="reload" type="button">Reload</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="controls" id="controls">
+      <div class="seek">
+        <div class="rail"><div class="buf" id="buf"></div><div class="fill" id="fill"></div></div>
+        <input id="seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Seek">
+      </div>
+      <div class="row">
+        <button class="ib txt" id="back" type="button" aria-label="Back 10 seconds">−10s</button>
+        <button class="ib main" id="pp" type="button" aria-label="Play"></button>
+        <button class="ib txt" id="fwd" type="button" aria-label="Forward 10 seconds">+10s</button>
+        <span class="time"><span id="cur">0:00</span> / <span id="dur">--:--</span></span>
+        <span class="sp"></span>
+        <select class="spd" id="spd" aria-label="Playback speed">
+          <option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="1" selected>1×</option>
+          <option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option>
+        </select>
+        <button class="ib" id="loop" type="button" aria-label="Loop" aria-pressed="false"></button>
+        <button class="ib" id="mute" type="button" aria-label="Mute"></button>
+        <input class="vol" id="vol" type="range" min="0" max="1" step="0.05" value="1" aria-label="Volume">
+        <button class="ib" id="pip" type="button" aria-label="Picture in picture" hidden></button>
+        <button class="ib" id="fs" type="button" aria-label="Fullscreen"></button>
+      </div>
+    </div>
+  </section>
+
+  <section class="card info">
+    <h1 id="title"></h1>
+    <p class="sub" id="sub"></p>
+    <div class="actions">
+      <a class="btn primary" id="dl" href="#">Download</a>
+      <button class="btn" id="copy" type="button">Copy stream link</button>
+    </div>
+    <p class="hint">Play it in VLC, MX Player or similar: open “Network Stream” and paste the copied link.</p>
+    <noscript><p class="hint">JavaScript is required for the online player. You can still use the Download button.</p></noscript>
+  </section>
+
+  <p class="keys" id="keys"><kbd>Space</kbd> play/pause · <kbd>←</kbd> <kbd>→</kbd> seek 5s · <kbd>J</kbd> <kbd>L</kbd> seek 10s · <kbd>↑</kbd> <kbd>↓</kbd> volume · <kbd>M</kbd> mute · <kbd>F</kbd> fullscreen · <kbd>0–9</kbd> jump</p>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script id="nova-data" type="application/json">__DATA__</script>
+<script>
+(function () {
+  'use strict';
+  const D = JSON.parse(document.getElementById('nova-data').textContent);
+  const $ = (id) => document.getElementById(id);
+  const kind = D.kind;
+  const P = {
+    play: 'M8 5v14l11-7z',
+    pause: 'M6 5h4v14H6zm8 0h4v14h-4z',
+    vol: 'M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z',
+    mute: 'M3 9v6h4l5 5V4L7 9H3zm13.6 3 2.7-2.7-1.4-1.4-2.7 2.7-2.7-2.7-1.4 1.4 2.7 2.7-2.7 2.7 1.4 1.4 2.7-2.7 2.7 2.7 1.4-1.4z',
+    fs: 'M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z',
+    pip: 'M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v14c0 1.1.9 1.98 2 1.98h18c1.1 0 2-.88 2-1.98V5c0-1.1-.9-2-2-2zm0 16.01H3V4.98h18v14.03z',
+    loop: 'M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z',
+    dl: 'M5 20h14v-2H5v2zM19 9h-4V3H9v6H5l7 7 7-7z'
+  };
+  const svg = (p, s) => '<svg viewBox="0 0 24 24" width="' + (s || 22) + '" height="' + (s || 22) + '" aria-hidden="true"><path fill="currentColor" d="' + p + '"/></svg>';
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+    del(k) { try { localStorage.removeItem(k); } catch (e) {} }
+  };
+
+  const player = $('player'), box = $('box');
+  player.classList.add('kind-' + kind);
+  document.title = D.name + ' · Nova Media Player';
+  $('title').textContent = D.name;
+  $('sub').textContent = [D.kind_label, D.size_human].filter(Boolean).join(' · ');
+  $('meta').textContent = [D.kind_label, D.size_human].filter(Boolean).join(' · ');
+  $('dl').href = D.download;
+  $('dl').insertAdjacentHTML('afterbegin', svg(P.dl, 18));
+  $('errdl').href = D.download;
+  $('reload').addEventListener('click', () => location.reload());
+
+  let toastTimer;
+  function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+  }
+  async function copyLink() {
+    const url = location.origin + D.stream;
+    try { await navigator.clipboard.writeText(url); toast('Stream link copied'); }
+    catch (e) { window.prompt('Copy this stream link:', url); }
+  }
+  $('copy').addEventListener('click', copyLink);
+  function showError() {
+    $('spin').hidden = true;
+    $('err').hidden = false;
+    player.classList.remove('playing');
+  }
+
+  /* ---------- image viewer ---------- */
+  if (kind === 'image') {
+    const img = new Image();
+    img.alt = D.name;
+    img.addEventListener('click', () => img.classList.toggle('actual'));
+    img.addEventListener('error', showError);
+    img.src = D.src;
+    box.appendChild(img);
+    $('controls').hidden = true;
+    $('bigplay').hidden = true;
+    $('keys').hidden = true;
+    return;
+  }
+
+  /* ---------- audio / video player ---------- */
+  const m = document.createElement(kind === 'audio' ? 'audio' : 'video');
+  m.preload = 'metadata';
+  m.setAttribute('playsinline', '');
+  m.src = D.src;
+  box.appendChild(m);
+  if (kind === 'audio') $('cover').hidden = false;
+
+  const seek = $('seek'), fill = $('fill'), buf = $('buf'), cur = $('cur'), dur = $('dur'), vol = $('vol');
+  const POS = 'nova:pos:' + D.token, VOL = 'nova:vol';
+  let dragging = false, lastSave = 0;
+
+  function fmt(t) {
+    if (!isFinite(t) || t < 0) t = 0;
+    t = Math.floor(t);
+    const h = Math.floor(t / 3600), mi = Math.floor(t % 3600 / 60), s = t % 60;
+    const pad = (n) => String(n).padStart(2, '0');
+    return (h ? h + ':' + pad(mi) : mi) + ':' + pad(s);
+  }
+  function toggle() {
+    if (m.paused || m.ended) { const p = m.play(); if (p && p.catch) p.catch(() => {}); }
+    else m.pause();
+  }
+  function skip(d) {
+    const max = isFinite(m.duration) ? m.duration : Infinity;
+    m.currentTime = Math.max(0, Math.min(max, m.currentTime + d));
+  }
+  function setPlaying(on) {
+    player.classList.toggle('playing', on);
+    $('pp').innerHTML = svg(on ? P.pause : P.play, 26);
+    $('pp').setAttribute('aria-label', on ? 'Pause' : 'Play');
+    $('bigplay').setAttribute('aria-label', on ? 'Pause' : 'Play');
+  }
+  function paint() {
+    const d = m.duration;
+    const r = isFinite(d) && d > 0 ? m.currentTime / d : 0;
+    if (!dragging) {
+      fill.style.width = (r * 100) + '%';
+      seek.value = Math.round(r * 1000);
+      cur.textContent = fmt(m.currentTime);
+    }
+  }
+  function paintBuf() {
+    const d = m.duration;
+    if (!isFinite(d) || !d || !m.buffered.length) return;
+    let end = 0;
+    const t = m.currentTime;
+    for (let i = 0; i < m.buffered.length; i++) {
+      if (m.buffered.start(i) <= t + 0.5 && m.buffered.end(i) > end) end = m.buffered.end(i);
+    }
+    buf.style.width = Math.min(100, end / d * 100) + '%';
+  }
+  function syncVol() {
+    const muted = m.muted || m.volume === 0;
+    $('mute').innerHTML = svg(muted ? P.mute : P.vol);
+    $('mute').setAttribute('aria-label', muted ? 'Unmute' : 'Mute');
+    vol.value = m.muted ? 0 : m.volume;
+    store.set(VOL, String(m.volume));
+  }
+  function toggleFs() {
+    const el = player;
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    } else if (el.requestFullscreen) {
+      el.requestFullscreen().catch(() => {});
+    } else if (el.webkitRequestFullscreen) {
+      el.webkitRequestFullscreen();
+    } else if (m.webkitEnterFullscreen) {
+      m.webkitEnterFullscreen();
+    }
+  }
+
+  /* media events */
+  m.addEventListener('loadedmetadata', () => {
+    dur.textContent = fmt(m.duration);
+    paint();
+    const saved = parseFloat(store.get(POS));
+    if (saved > 5 && isFinite(m.duration) && saved < m.duration - 5) {
+      m.currentTime = saved;
+      toast('Resumed from ' + fmt(saved));
+    }
+  });
+  m.addEventListener('durationchange', () => { dur.textContent = fmt(m.duration); });
+  m.addEventListener('timeupdate', () => {
+    paint(); paintBuf();
+    const now = Date.now();
+    if (now - lastSave > 3000 && m.currentTime > 5) { lastSave = now; store.set(POS, String(m.currentTime)); }
+  });
+  m.addEventListener('progress', paintBuf);
+  m.addEventListener('play', () => setPlaying(true));
+  m.addEventListener('pause', () => setPlaying(false));
+  m.addEventListener('ended', () => { setPlaying(false); store.del(POS); });
+  m.addEventListener('waiting', () => { $('spin').hidden = false; });
+  m.addEventListener('playing', () => { $('spin').hidden = true; });
+  m.addEventListener('canplay', () => { $('spin').hidden = true; });
+  m.addEventListener('error', showError);
+  m.addEventListener('volumechange', syncVol);
+  window.addEventListener('pagehide', () => {
+    if (!m.ended && m.currentTime > 5 && isFinite(m.duration) && m.duration - m.currentTime > 5) store.set(POS, String(m.currentTime));
+  });
+
+  /* controls */
+  seek.addEventListener('input', () => {
+    dragging = true;
+    const d = m.duration;
+    if (isFinite(d)) { fill.style.width = (seek.value / 10) + '%'; cur.textContent = fmt(seek.value / 1000 * d); }
+  });
+  seek.addEventListener('change', () => {
+    dragging = false;
+    const d = m.duration;
+    if (isFinite(d)) m.currentTime = seek.value / 1000 * d;
+  });
+  seek.addEventListener('blur', () => { dragging = false; });
+  $('pp').addEventListener('click', toggle);
+  $('back').addEventListener('click', () => skip(-10));
+  $('fwd').addEventListener('click', () => skip(10));
+  $('spd').addEventListener('change', () => { m.playbackRate = parseFloat($('spd').value); });
+  $('loop').addEventListener('click', () => {
+    m.loop = !m.loop;
+    $('loop').classList.toggle('on', m.loop);
+    $('loop').setAttribute('aria-pressed', String(m.loop));
+    toast(m.loop ? 'Loop on' : 'Loop off');
+  });
+  $('mute').addEventListener('click', () => { m.muted = !m.muted; });
+  vol.addEventListener('input', () => { m.muted = false; m.volume = parseFloat(vol.value); });
+  $('fs').addEventListener('click', toggleFs);
+  if (kind === 'video' && document.pictureInPictureEnabled) {
+    $('pip').hidden = false;
+    $('pip').addEventListener('click', () => {
+      if (document.pictureInPictureElement) document.exitPictureInPicture().catch(() => {});
+      else m.requestPictureInPicture().catch(() => toast('Picture-in-picture is not available'));
+    });
+  }
+  if (kind === 'audio') $('fs').hidden = true;
+  $('screen').addEventListener('click', (e) => { if (!e.target.closest('.err')) toggle(); });
+  if (kind === 'video') $('screen').addEventListener('dblclick', (e) => { if (!e.target.closest('.err')) toggleFs(); });
+
+  /* keyboard shortcuts */
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const tag = e.target.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    const k = e.key;
+    if (k === ' ' || k === 'Spacebar') {
+      if (tag === 'BUTTON' || tag === 'A') return;
+      e.preventDefault(); toggle();
+    } else if (k === 'k' || k === 'K') { e.preventDefault(); toggle(); }
+    else if (k === 'ArrowLeft') { e.preventDefault(); skip(-5); }
+    else if (k === 'ArrowRight') { e.preventDefault(); skip(5); }
+    else if (k === 'j' || k === 'J') skip(-10);
+    else if (k === 'l' || k === 'L') skip(10);
+    else if (k === 'ArrowUp') { e.preventDefault(); m.muted = false; m.volume = Math.min(1, m.volume + 0.05); }
+    else if (k === 'ArrowDown') { e.preventDefault(); m.volume = Math.max(0, m.volume - 0.05); }
+    else if (k === 'm' || k === 'M') m.muted = !m.muted;
+    else if ((k === 'f' || k === 'F') && kind === 'video') toggleFs();
+    else if (/^[0-9]$/.test(k) && isFinite(m.duration)) m.currentTime = m.duration * (parseInt(k, 10) / 10);
+  });
+
+  /* lock-screen / headset controls */
+  try {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: D.name, artist: 'Nova Media Player' });
+      navigator.mediaSession.setActionHandler('play', () => m.play());
+      navigator.mediaSession.setActionHandler('pause', () => m.pause());
+      navigator.mediaSession.setActionHandler('seekbackward', () => skip(-10));
+      navigator.mediaSession.setActionHandler('seekforward', () => skip(10));
+    }
+  } catch (e) {}
+
+  /* initial UI state */
+  $('loop').innerHTML = svg(P.loop);
+  $('pip').innerHTML = svg(P.pip);
+  $('fs').innerHTML = svg(P.fs);
+  $('bigplay').innerHTML = svg(P.play, 34);
+  const sv = parseFloat(store.get(VOL));
+  if (sv >= 0 && sv <= 1) m.volume = sv;
+  setPlaying(false);
+  syncVol();
+})();
+</script>
+</body>
+</html>
